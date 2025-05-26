@@ -1,43 +1,114 @@
 const mongoose = require('mongoose');
 
-// Nutritional information schema
+// Nutritional information schema with validation
 const nutritionSchema = new mongoose.Schema({
-  calorias: { type: Number, default: 0 },
-  proteinas: { type: Number, default: 0 }, // grams
-  carbohidratos: { type: Number, default: 0 }, // grams
-  grasas: { type: Number, default: 0 }, // grams
-  fibra: { type: Number, default: 0 }, // grams
-  sodio: { type: Number, default: 0 }, // mg
-  azucar: { type: Number, default: 0 } // grams
+  calorias: { 
+    type: Number, 
+    default: 0,
+    min: [0, 'Las calorías no pueden ser negativas'],
+    max: [10000, 'Las calorías no pueden exceder 10000']
+  },
+  proteinas: { 
+    type: Number, 
+    default: 0,
+    min: [0, 'Las proteínas no pueden ser negativas'],
+    max: [1000, 'Las proteínas no pueden exceder 1000g']
+  }, // grams
+  carbohidratos: { 
+    type: Number, 
+    default: 0,
+    min: [0, 'Los carbohidratos no pueden ser negativos'],
+    max: [1000, 'Los carbohidratos no pueden exceder 1000g']
+  }, // grams
+  grasas: { 
+    type: Number, 
+    default: 0,
+    min: [0, 'Las grasas no pueden ser negativas'],
+    max: [1000, 'Las grasas no pueden exceder 1000g']
+  }, // grams
+  fibra: { 
+    type: Number, 
+    default: 0,
+    min: [0, 'La fibra no puede ser negativa'],
+    max: [200, 'La fibra no puede exceder 200g']
+  }, // grams
+  sodio: { 
+    type: Number, 
+    default: 0,
+    min: [0, 'El sodio no puede ser negativo'],
+    max: [50000, 'El sodio no puede exceder 50000mg']
+  }, // mg
+  azucar: { 
+    type: Number, 
+    default: 0,
+    min: [0, 'El azúcar no puede ser negativo'],
+    max: [1000, 'El azúcar no puede exceder 1000g']
+  } // grams
 }, { _id: false });
 
-// Ingredient schema with enhanced features
+// Ingredient schema with enhanced features and validation
 const ingredienteSchema = new mongoose.Schema({
   nombre: { 
     type: String, 
-    required: true,
+    required: [true, 'El nombre del ingrediente es obligatorio'],
     trim: true,
-    lowercase: true // For consistent searching
+    lowercase: true, // For consistent searching
+    minlength: [2, 'El nombre debe tener al menos 2 caracteres'],
+    maxlength: [100, 'El nombre no puede exceder 100 caracteres'],
+    validate: {
+      validator: function(v) {
+        return /^[a-záéíóúñü0-9\s\-.,()]+$/i.test(v);
+      },
+      message: 'El nombre contiene caracteres no válidos'
+    }
   },
   cantidad: { 
     type: Number, 
-    required: true,
-    min: 0
+    required: [true, 'La cantidad es obligatoria'],
+    min: [0.001, 'La cantidad debe ser mayor a 0'],
+    max: [10000, 'La cantidad no puede exceder 10000'],
+    validate: {
+      validator: function(v) {
+        return Number.isFinite(v) && v > 0;
+      },
+      message: 'La cantidad debe ser un número válido mayor a 0'
+    }
   },
   unidad: { 
     type: String, 
-    required: true,
-    enum: ['kg', 'g', 'l', 'ml', 'piezas', 'tazas', 'cucharadas', 'cucharaditas', 'latas', 'paquetes'],
+    required: [true, 'La unidad es obligatoria'],
+    enum: {
+      values: ['kg', 'g', 'l', 'ml', 'piezas', 'tazas', 'cucharadas', 'cucharaditas', 'latas', 'paquetes'],
+      message: 'Unidad no válida. Debe ser: kg, g, l, ml, piezas, tazas, cucharadas, cucharaditas, latas, paquetes'
+    },
     default: 'g'
   },
   categoria: {
     type: String,
-    enum: ['proteina', 'vegetales', 'frutas', 'lacteos', 'granos', 'especias', 'aceites', 'otros'],
+    enum: {
+      values: ['proteina', 'vegetales', 'frutas', 'lacteos', 'granos', 'especias', 'aceites', 'otros'],
+      message: 'Categoría no válida'
+    },
     default: 'otros'
   },
   // For cost calculation and shopping lists
-  costoUnitario: { type: Number, default: 0 }, // cost per unit
-  proveedor: { type: String, trim: true },
+  costoUnitario: { 
+    type: Number, 
+    default: 0,
+    min: [0, 'El costo unitario no puede ser negativo'],
+    max: [10000, 'El costo unitario no puede exceder 10000'],
+    validate: {
+      validator: function(v) {
+        return v === 0 || (Number.isFinite(v) && v >= 0);
+      },
+      message: 'El costo unitario debe ser un número válido mayor o igual a 0'
+    }
+  },
+  proveedor: { 
+    type: String, 
+    trim: true,
+    maxlength: [100, 'El nombre del proveedor no puede exceder 100 caracteres']
+  },
   
   // Nutritional info per ingredient (optional)
   nutricion: nutritionSchema,
@@ -45,41 +116,79 @@ const ingredienteSchema = new mongoose.Schema({
   // For dietary restrictions
   alergenos: [{ 
     type: String, 
-    enum: ['gluten', 'lacteos', 'huevos', 'nueces', 'mariscos', 'soya', 'pescado']
+    enum: {
+      values: ['gluten', 'lacteos', 'huevos', 'nueces', 'mariscos', 'soya', 'pescado'],
+      message: 'Alérgeno no válido'
+    }
   }],
   
   // Ingredient substitutions
   sustitutos: [{
-    nombre: String,
-    factor: { type: Number, default: 1 }, // conversion factor
-    notas: String
+    nombre: {
+      type: String,
+      trim: true,
+      maxlength: [100, 'El nombre del sustituto no puede exceder 100 caracteres']
+    },
+    factor: { 
+      type: Number, 
+      default: 1,
+      min: [0.1, 'El factor de conversión debe ser al menos 0.1'],
+      max: [10, 'El factor de conversión no puede exceder 10']
+    },
+    notas: {
+      type: String,
+      trim: true,
+      maxlength: [500, 'Las notas no pueden exceder 500 caracteres']
+    }
   }]
 }, { _id: false });
 
-// Main recipe schema
+// Main recipe schema with enhanced validation
 const recetaOptimizadaSchema = new mongoose.Schema({
   nombre: {
     type: String,
-    required: true,
+    required: [true, 'El nombre de la receta es obligatorio'],
     trim: true,
-    index: true
+    index: true,
+    minlength: [3, 'El nombre debe tener al menos 3 caracteres'],
+    maxlength: [200, 'El nombre no puede exceder 200 caracteres'],
+    validate: {
+      validator: function(v) {
+        return /^[a-záéíóúñü0-9\s\-.,()]+$/i.test(v);
+      },
+      message: 'El nombre contiene caracteres no válidos'
+    }
   },
   
   descripcion: {
     type: String,
-    required: true
+    required: [true, 'La descripción es obligatoria'],
+    trim: true,
+    minlength: [10, 'La descripción debe tener al menos 10 caracteres'],
+    maxlength: [1000, 'La descripción no puede exceder 1000 caracteres']
   },
   
   // Enhanced categorization
   categoria: {
     type: String,
-    enum: ['sopa', 'plato-fuerte', 'guarnicion', 'postre', 'bebida', 'entrada'],
-    required: true,
+    enum: {
+      values: ['sopa', 'plato-fuerte', 'guarnicion', 'postre', 'bebida', 'entrada'],
+      message: 'Categoría no válida'
+    },
+    required: [true, 'La categoría es obligatoria'],
     index: true
   },
   
-  // Embedded ingredients (MongoDB strength)
-  ingredientes: [ingredienteSchema],
+  // Embedded ingredients (MongoDB strength) - at least one ingredient required
+  ingredientes: {
+    type: [ingredienteSchema],
+    validate: {
+      validator: function(v) {
+        return v && v.length > 0;
+      },
+      message: 'La receta debe tener al menos un ingrediente'
+    }
+  },
   
   // Recipe metadata
   tiempoPreparacion: { type: Number, default: 0 }, // minutes
