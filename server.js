@@ -228,22 +228,68 @@ app.get('/api/debug', async (req, res) => {
 app.get('/api/recipes-debug', async (req, res) => {
   try {
     const Receta = require('./models/Receta');
+    const mongoose = require('mongoose');
     
     // Attempt to get total count
     const count = await Receta.countDocuments();
     
     // Get sample recipes to verify structure
-    const sampleRecipes = await Receta.find().limit(2).lean();
+    const sampleRecipes = await Receta.find().limit(3).lean();
+    
+    // Get raw collection data to see actual field names
+    const rawRecipes = await mongoose.connection.db
+      .collection('recetas')
+      .find({})
+      .limit(3)
+      .toArray();
+    
+    // Check if there's a separate ingredients collection
+    let ingredientsCollection = null;
+    try {
+      const ingredientsCount = await mongoose.connection.db
+        .collection('ingredientes')
+        .countDocuments();
+      
+      const sampleIngredients = await mongoose.connection.db
+        .collection('ingredientes')
+        .find({})
+        .limit(5)
+        .toArray();
+        
+      ingredientsCollection = {
+        count: ingredientsCount,
+        samples: sampleIngredients
+      };
+    } catch (err) {
+      ingredientsCollection = { error: 'Collection not found or accessible' };
+    }
     
     // Get collection info
-    const mongoose = require('mongoose');
     const collectionInfo = await mongoose.connection.db
       .collection('recetas')
       .stats();
     
+    // Analyze field structure
+    const fieldAnalysis = {};
+    if (rawRecipes.length > 0) {
+      rawRecipes.forEach((recipe, index) => {
+        fieldAnalysis[`recipe_${index + 1}_fields`] = Object.keys(recipe);
+        if (recipe.ingredientes) {
+          fieldAnalysis[`recipe_${index + 1}_ingredientes_type`] = Array.isArray(recipe.ingredientes) ? 'array' : typeof recipe.ingredientes;
+          fieldAnalysis[`recipe_${index + 1}_ingredientes_length`] = Array.isArray(recipe.ingredientes) ? recipe.ingredientes.length : 'not_array';
+          if (Array.isArray(recipe.ingredientes) && recipe.ingredientes.length > 0) {
+            fieldAnalysis[`recipe_${index + 1}_first_ingredient_fields`] = Object.keys(recipe.ingredientes[0]);
+          }
+        }
+      });
+    }
+    
     res.status(200).json({
       total_recipes: count,
-      sample_recipes: sampleRecipes,
+      sample_recipes_mongoose: sampleRecipes,
+      raw_recipes_from_db: rawRecipes,
+      field_analysis: fieldAnalysis,
+      ingredients_collection: ingredientsCollection,
       collection_info: collectionInfo
     });
   } catch (error) {
