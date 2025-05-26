@@ -235,4 +235,47 @@ clienteOptimizadoSchema.pre('save', function(next) {
   next();
 });
 
+// Add pre-save hook to update meal plans
+clienteOptimizadoSchema.pre('save', async function(next) {
+  try {
+    // Check if relevant fields have been modified
+    if (this.isModified('preferenciasDieteticas') || 
+        this.isModified('miembrosHogar') || 
+        this.isModified('preferenciasPlanes')) {
+      
+      // Get all active meal plans for this client
+      const PlanComidasOptimizado = mongoose.model('PlanComidasOptimizado');
+      const planes = await PlanComidasOptimizado.find({
+        clienteId: this._id,
+        estado: 'activo'
+      });
+      
+      // Update each plan's denormalized client preferences
+      for (const plan of planes) {
+        plan.preferenciasCliente = {
+          restriccionesDieteticas: this.preferenciasDieteticas.restricciones.map(r => ({
+            tipo: r.tipo,
+            nivel: r.nivel
+          })),
+          alergias: this.preferenciasDieteticas.alergias.map(a => ({
+            alergeno: a.alergeno,
+            severidad: a.severidad
+          })),
+          miembrosHogar: this.miembrosHogar,
+          preferenciasCocina: {
+            nivelCocina: this.preferenciasPlanes.nivelCocina,
+            equipoDisponible: this.preferenciasPlanes.equipoCocina,
+            tiempoMaximoPreparacion: this.preferenciasPlanes.tiempoPreparacionMaximo
+          }
+        };
+        
+        await plan.save();
+      }
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
 module.exports = mongoose.model('ClienteOptimizado', clienteOptimizadoSchema, 'clientes_optimizados'); 
