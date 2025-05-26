@@ -336,4 +336,87 @@ recetaOptimizadaSchema.pre('save', function(next) {
   next();
 });
 
+// Add pre-save hook to update meal plans
+recetaOptimizadaSchema.pre('save', async function(next) {
+  try {
+    // Check if any relevant fields have been modified
+    if (this.isModified('nombre') || 
+        this.isModified('categoria') ||
+        this.isModified('tiempoPreparacion') ||
+        this.isModified('tiempoCoccion') ||
+        this.isModified('dificultad') ||
+        this.isModified('porcionesBase') ||
+        this.isModified('nutricionPorPorcion') ||
+        this.isModified('ingredientes') ||
+        this.isModified('restriccionesDieteticas')) {
+      
+      // Get all meal plans using this recipe
+      const PlanComidasOptimizado = mongoose.model('PlanComidasOptimizado');
+      const planes = await PlanComidasOptimizado.find({
+        'dias.comidas.recetaId': this._id
+      });
+      
+      // Update each plan's denormalized recipe info
+      for (const plan of planes) {
+        for (const dia of plan.dias) {
+          const tiposComida = ['desayuno', 'almuerzo', 'cena'];
+          
+          // Process regular meals
+          for (const tipo of tiposComida) {
+            const comida = dia.comidas[tipo];
+            if (comida?.recetaId?.equals(this._id)) {
+              updateComidaWithRecipeInfo(comida, this);
+            }
+          }
+          
+          // Process comida (lunch) which has multiple components
+          if (dia.comidas.comida) {
+            const componentes = ['sopa', 'principal', 'guarnicion'];
+            for (const componente of componentes) {
+              const comida = dia.comidas.comida[componente];
+              if (comida?.recetaId?.equals(this._id)) {
+                updateComidaWithRecipeInfo(comida, this);
+              }
+            }
+          }
+          
+          // Process snacks
+          if (dia.comidas.colaciones) {
+            for (const comida of dia.comidas.colaciones) {
+              if (comida?.recetaId?.equals(this._id)) {
+                updateComidaWithRecipeInfo(comida, this);
+              }
+            }
+          }
+        }
+        
+        await plan.save();
+      }
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Helper function to update meal with recipe info
+function updateComidaWithRecipeInfo(comida, receta) {
+  comida.recetaInfo = {
+    nombre: receta.nombre,
+    categoria: receta.categoria,
+    tiempoPreparacion: receta.tiempoPreparacion,
+    tiempoCoccion: receta.tiempoCoccion,
+    dificultad: receta.dificultad,
+    porcionesBase: receta.porcionesBase,
+    nutricionPorPorcion: receta.nutricionPorPorcion,
+    ingredientesPrincipales: receta.ingredientes.slice(0, 5).map(ing => ({
+      nombre: ing.nombre,
+      cantidad: ing.cantidad,
+      unidad: ing.unidad,
+      categoria: ing.categoria
+    })),
+    restriccionesDieteticas: receta.restriccionesDieteticas
+  };
+}
+
 module.exports = mongoose.model('RecetaOptimizada', recetaOptimizadaSchema, 'recetas_optimizadas'); 

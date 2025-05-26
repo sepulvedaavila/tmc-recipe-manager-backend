@@ -8,6 +8,37 @@ const comidaSchema = new mongoose.Schema({
     required: true
   },
   
+  // Denormalized recipe information
+  recetaInfo: {
+    nombre: String,
+    categoria: String,
+    tiempoPreparacion: Number,
+    tiempoCoccion: Number,
+    dificultad: String,
+    porcionesBase: Number,
+    
+    // Essential nutritional info
+    nutricionPorPorcion: {
+      calorias: Number,
+      proteinas: Number,
+      carbohidratos: Number,
+      grasas: Number,
+      fibra: Number,
+      sodio: Number
+    },
+    
+    // Essential ingredients for shopping list
+    ingredientesPrincipales: [{
+      nombre: String,
+      cantidad: Number,
+      unidad: String,
+      categoria: String
+    }],
+    
+    // Dietary classifications
+    restriccionesDieteticas: [String]
+  },
+  
   // Scaling for this specific meal
   porcionesPersonalizadas: Number, // If different from plan default
   
@@ -149,6 +180,34 @@ const planComidasOptimizadoSchema = new mongoose.Schema({
     index: true
   },
   
+  // Denormalized client preferences
+  preferenciasCliente: {
+    // Dietary restrictions
+    restriccionesDieteticas: [{
+      tipo: String,
+      nivel: String
+    }],
+    
+    // Allergies
+    alergias: [{
+      alergeno: String,
+      severidad: String
+    }],
+    
+    // Household info for portions
+    miembrosHogar: {
+      adultos: Number,
+      ninos: Number
+    },
+    
+    // Cooking preferences
+    preferenciasCocina: {
+      nivelCocina: String,
+      equipoDisponible: [String],
+      tiempoMaximoPreparacion: Number
+    }
+  },
+  
   // Plan period
   fechaInicio: {
     type: Date,
@@ -265,6 +324,19 @@ planComidasOptimizadoSchema.index({ estado: 1, fechaInicio: 1 });
 planComidasOptimizadoSchema.index({ esPlantilla: 1, vecesUsado: -1 });
 planComidasOptimizadoSchema.index({ 'dias.fecha': 1 });
 planComidasOptimizadoSchema.index({ nombre: 'text', comentariosGenerales: 'text' });
+
+// Add new indexes for denormalized fields
+planComidasOptimizadoSchema.index({ 
+  'preferenciasCliente.restriccionesDieteticas.tipo': 1 
+});
+
+planComidasOptimizadoSchema.index({ 
+  'preferenciasCliente.alergias.alergeno': 1 
+});
+
+planComidasOptimizadoSchema.index({ 
+  'dias.comidas.recetaInfo.categoria': 1 
+});
 
 // Virtual for plan duration
 planComidasOptimizadoSchema.virtual('duracionDias').get(function() {
