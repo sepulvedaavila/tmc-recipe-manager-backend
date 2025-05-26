@@ -76,12 +76,13 @@ app.use(ensureDbConnection);
 
 // API Routes - Mount routes to match frontend expectations
 // Vercel routes /api/* to this function, so we need to handle the remaining path
-app.use('/recipes', recetasRoutes);        // Frontend calls /api/recipes
-app.use('/clients', clientesRoutes);       // Frontend calls /api/clients (not /clientes)
-app.use('/planes', planesRoutes);          // Frontend calls /api/planes  
-app.use('/plans', planesRoutes);           // Alternative: Frontend also calls /api/plans
-app.use('/plan-recetas', planRecetasRoutes);
-app.use('/meal-plans', mealPlansRoutes);
+app.use('/api/recipes', recetasRoutes);
+app.use('/api/clients', clientesRoutes);
+app.use('/api/planes', planesRoutes);
+app.use('/api/plans', planesRoutes);
+app.use('/api/plan-recetas', planRecetasRoutes);
+app.use('/api/meal-plans', mealPlansRoutes);
+// Rerouting for frontend
 
 // Test endpoint to verify API is working
 app.get('/test', (req, res) => {
