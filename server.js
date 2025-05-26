@@ -85,7 +85,7 @@ app.use('/api/meal-plans', mealPlansRoutes);
 // Rerouting for frontend
 
 // Test endpoint to verify API is working
-app.get('/test', (req, res) => {
+app.get('/api/test', (req, res) => {
   res.json({ 
     message: 'API is working!', 
     timestamp: new Date().toISOString(),
@@ -101,7 +101,7 @@ app.get('/test', (req, res) => {
 });
 
 // Health check endpoint with database status
-app.get('/health', async (req, res) => {
+app.get('/api/health', async (req, res) => {
   try {
     const connectionStatus = getConnectionStatus();
     
@@ -138,7 +138,7 @@ app.get('/health', async (req, res) => {
 });
 
 // Diagnostic endpoint for debugging
-app.get('/debug', async (req, res) => {
+app.get('/api/debug', async (req, res) => {
   try {
     // Check MongoDB connection using our helper function
     const connectionStatus = getConnectionStatus();
@@ -225,7 +225,7 @@ app.get('/debug', async (req, res) => {
 });
 
 // Add a specific recipes diagnostic endpoint
-app.get('/recipes-debug', async (req, res) => {
+app.get('/api/recipes-debug', async (req, res) => {
   try {
     const Receta = require('./models/Receta');
     
