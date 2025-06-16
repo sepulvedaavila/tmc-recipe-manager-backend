@@ -13,6 +13,8 @@ const planesRoutes = require("./routes/planes");
 const clientesRoutes = require("./routes/clientes");
 const planRecetasRoutes = require("./routes/planRecetas");
 const mealPlansRoutes = require("./routes/mealPlans");
+const authRoutes = require("./routes/auth");
+const usersRoutes = require("./routes/users");
 
 // Initialize express app
 const app = express();
@@ -81,6 +83,8 @@ app.use(ensureDbConnection);
 
 // API Routes - Mount routes to match frontend expectations
 // Vercel routes /api/* to this function, so we need to handle the remaining path
+app.use("/api/auth", authRoutes);
+app.use("/api/users", usersRoutes);
 app.use("/api/recipes", recetasRoutes);
 app.use("/api/clients", clientesRoutes);
 app.use("/api/planes", planesRoutes);
