@@ -48,28 +48,42 @@ const app = express();
 // Configure CORS - essential for both development and production
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, etc.)
+    // Allow requests with no origin (mobile apps, curl, postman)
     if (!origin) return callback(null, true);
     
-    const allowedOrigins = process.env.ALLOWED_ORIGINS 
+    const allowedOrigins = process.env.ALLOWED_ORIGINS
       ? process.env.ALLOWED_ORIGINS.split(",")
-      : ["http://localhost:3000", "http://localhost:3001"];
+      : [
+          "http://localhost:3000", 
+          "http://localhost:3001",
+          "https://app.themenucompany.mx",
+          "https://tmc-recipe-manager-frontend.vercel.app",
+          "https://tmc-recipe-manager-backend.vercel.app"
+        ];
     
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
+      console.log(`CORS blocked origin: ${origin}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
   optionsSuccessStatus: 200,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+  allowedHeaders: [
+    "Content-Type", 
+    "Authorization", 
+    "X-Requested-With",
+    "Accept",
+    "Origin"
+  ],
+  exposedHeaders: ["Set-Cookie"]
 };
 
 app.use(cors(corsOptions));
 
-// Handle OPTIONS requests for preflight explicitly - critical for browser API calls
+// Handle preflight requests explicitly
 app.options("*", cors(corsOptions));
 
 // Request parsing middleware

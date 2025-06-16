@@ -1,3 +1,4 @@
+// models/User.js
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 
@@ -39,11 +40,20 @@ const userSchema = new mongoose.Schema({
       type: String,
       enum: ['vegetarian', 'vegan', 'gluten-free', 'dairy-free', 'nut-free', 'low-carb', 'keto', 'paleo']
     }],
-    allergies: [String],
-    cuisinePreferences: [String],
+    allergies: [{
+      type: String,
+      trim: true,
+      lowercase: true
+    }],
+    cuisinePreferences: [{
+      type: String,
+      trim: true
+    }],
     servingSize: {
       type: Number,
-      default: 2
+      default: 2,
+      min: 1,
+      max: 20
     }
   },
   stats: {
@@ -68,6 +78,63 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Add a pre-save hook to handle data migration/cleaning
+userSchema.pre('save', async function(next) {
+  try {
+    // Handle password hashing
+    if (this.isModified('password')) {
+      // Check if password is already hashed
+      if (!this.password.startsWith('$2a$') && !this.password.startsWith('$2b$')) {
+        const salt = await bcrypt.genSalt(10);
+        this.password = await bcrypt.hash(this.password, salt);
+      }
+    }
+    
+    // Fix preferences.dietary data if it's corrupted
+    if (this.preferences && this.preferences.dietary) {
+      // Check if dietary is a string that looks like JSON
+      if (typeof this.preferences.dietary === 'string') {
+        try {
+          const parsed = JSON.parse(this.preferences.dietary);
+          // If it's an array with objects, extract the data properly
+          if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === 'object') {
+            // Reset to empty array for now - you can customize this logic
+            this.preferences.dietary = [];
+            console.log('Fixed corrupted dietary preferences for user:', this.email);
+          }
+        } catch (e) {
+          // If it's not valid JSON, reset to empty array
+          this.preferences.dietary = [];
+          console.log('Reset invalid dietary preferences for user:', this.email);
+        }
+      }
+      
+      // Ensure dietary is always an array
+      if (!Array.isArray(this.preferences.dietary)) {
+        this.preferences.dietary = [];
+      }
+      
+      // Filter out any invalid enum values
+      const validDietaryOptions = ['vegetarian', 'vegan', 'gluten-free', 'dairy-free', 'nut-free', 'low-carb', 'keto', 'paleo'];
+      this.preferences.dietary = this.preferences.dietary.filter(item => 
+        typeof item === 'string' && validDietaryOptions.includes(item)
+      );
+    }
+    
+    // Ensure allergies is always an array of strings
+    if (this.preferences && this.preferences.allergies) {
+      if (!Array.isArray(this.preferences.allergies)) {
+        this.preferences.allergies = [];
+      }
+      this.preferences.allergies = this.preferences.allergies.filter(item => typeof item === 'string');
+    }
+    
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Compare password method
 userSchema.methods.comparePassword = async function(candidatePassword) {
   try {
@@ -76,28 +143,6 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
     throw new Error('Error comparing passwords');
   }
 };
-
-// Generate password hash before saving
-userSchema.pre('save', async function(next) {
-  // Only hash the password if it has been modified (or is new)
-  if (!this.isModified('password')) {
-    return next();
-  }
-
-  try {
-    // Check if password is already hashed (bcrypt hashes start with $2a$ or $2b$)
-    if (this.password.startsWith('$2a$') || this.password.startsWith('$2b$')) {
-      return next();
-    }
-
-    // Generate salt and hash password
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
-    next();
-  } catch (error) {
-    next(error);
-  }
-});
 
 // Update stats on login
 userSchema.methods.updateLoginStats = async function() {
