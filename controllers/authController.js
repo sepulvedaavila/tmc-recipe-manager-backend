@@ -1,7 +1,191 @@
+// controllers/authController.js
 const User = require('../models/User');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { generateToken, generateRefreshToken } = require('../middleware/auth');
+
+// @desc    Login user
+// @route   POST /api/auth/login
+// @access  Public
+exports.login = async (req, res) => {
+  try {
+    const { email, username, password } = req.body;
+
+    // Validate input
+    if ((!email && !username) || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide email/username and password'
+      });
+    }
+
+    // Find user by email or username with more explicit error handling
+    let user;
+    try {
+      user = await User.findOne({
+        $or: [
+          { email: email || '' },
+          { username: username || email || '' }
+        ]
+      });
+    } catch (dbError) {
+      console.error('Database error during user lookup:', dbError);
+      
+      // Check if it's a validation error related to preferences
+      if (dbError.name === 'ValidationError' && dbError.message.includes('preferences.dietary')) {
+        console.log('🔧 Detected corrupted user preferences, attempting to fix...');
+        
+        // Try to find and fix the user data
+        try {
+          const rawUser = await User.findOne({
+            $or: [
+              { email: email || '' },
+              { username: username || email || '' }
+            ]
+          }).lean(); // Get raw data without validation
+          
+          if (rawUser) {
+            // Fix the preferences data
+            const fixedPreferences = {
+              dietary: [],
+              allergies: [],
+              cuisinePreferences: [],
+              servingSize: 2
+            };
+            
+            // Update the user with fixed preferences
+            await User.updateOne(
+              { _id: rawUser._id },
+              { 
+                $set: { 
+                  preferences: fixedPreferences 
+                }
+              }
+            );
+            
+            console.log(`✅ Fixed preferences for user: ${rawUser.email}`);
+            
+            // Now try to find the user again
+            user = await User.findById(rawUser._id);
+          }
+        } catch (fixError) {
+          console.error('Failed to fix user preferences:', fixError);
+          return res.status(500).json({
+            success: false,
+            message: 'User data corruption detected. Please contact support.',
+            error: 'DATA_CORRUPTION'
+          });
+        }
+      } else {
+        // Other database errors
+        return res.status(500).json({
+          success: false,
+          message: 'Database error occurred',
+          error: dbError.message
+        });
+      }
+    }
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
+    }
+
+    // Check password
+    let isMatch;
+    try {
+      isMatch = await user.comparePassword(password);
+    } catch (passwordError) {
+      console.error('Password comparison error:', passwordError);
+      return res.status(500).json({
+        success: false,
+        message: 'Authentication error occurred',
+        error: passwordError.message
+      });
+    }
+
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
+    }
+
+    // Check if user is active
+    if (user.status !== 'active') {
+      return res.status(401).json({
+        success: false,
+        message: 'User account is not active'
+      });
+    }
+
+    // Update login stats
+    try {
+      await user.updateLoginStats();
+    } catch (statsError) {
+      console.error('Failed to update login stats:', statsError);
+      // Don't fail login for stats update errors
+    }
+
+    // Generate tokens
+    let token, refreshToken;
+    try {
+      token = generateToken(user._id);
+      refreshToken = generateRefreshToken(user._id);
+    } catch (tokenError) {
+      console.error('Token generation error:', tokenError);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to generate authentication tokens',
+        error: tokenError.message
+      });
+    }
+
+    // Save refresh token
+    try {
+      user.refreshToken = refreshToken;
+      await user.save();
+    } catch (saveError) {
+      console.error('Failed to save refresh token:', saveError);
+      // Continue with login even if refresh token save fails
+    }
+
+    // Successful login response
+    res.status(200).json({
+      success: true,
+      token,
+      refreshToken,
+      user: user.toJSON() // This will exclude sensitive fields
+    });
+
+  } catch (error) {
+    console.error('Login error:', error);
+    
+    // Provide more specific error messages based on error type
+    let errorMessage = 'Error logging in';
+    let errorCode = 'GENERAL_ERROR';
+    
+    if (error.name === 'ValidationError') {
+      errorMessage = 'User data validation failed';
+      errorCode = 'VALIDATION_ERROR';
+    } else if (error.name === 'CastError') {
+      errorMessage = 'Invalid user data format';
+      errorCode = 'CAST_ERROR';
+    } else if (error.message.includes('preferences.dietary')) {
+      errorMessage = 'User preferences data is corrupted';
+      errorCode = 'PREFERENCES_CORRUPTION';
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: errorMessage,
+      error: error.message,
+      code: errorCode
+    });
+  }
+};
 
 // @desc    Register user
 // @route   POST /api/auth/register
@@ -30,13 +214,21 @@ exports.register = async (req, res) => {
       });
     }
 
-    // Create user
-    const user = await User.create({
+    // Create user with default preferences
+    const userData = {
       username,
       email,
       password,
-      role: role || 'user'
-    });
+      role: role || 'user',
+      preferences: {
+        dietary: [],
+        allergies: [],
+        cuisinePreferences: [],
+        servingSize: 2
+      }
+    };
+
+    const user = await User.create(userData);
 
     // Generate tokens
     const token = generateToken(user._id);
@@ -50,88 +242,13 @@ exports.register = async (req, res) => {
       success: true,
       token,
       refreshToken,
-      user
+      user: user.toJSON()
     });
   } catch (error) {
     console.error('Register error:', error);
     res.status(500).json({
       success: false,
       message: 'Error registering user',
-      error: error.message
-    });
-  }
-};
-
-// @desc    Login user
-// @route   POST /api/auth/login
-// @access  Public
-exports.login = async (req, res) => {
-  try {
-    const { email, username, password } = req.body;
-
-    // Validate input
-    if ((!email && !username) || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide email/username and password'
-      });
-    }
-
-    // Find user by email or username
-    const user = await User.findOne({
-      $or: [
-        { email: email || '' },
-        { username: username || email || '' }
-      ]
-    });
-
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
-    }
-
-    // Check password
-    const isMatch = await user.comparePassword(password);
-
-    if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
-    }
-
-    // Check if user is active
-    if (user.status !== 'active') {
-      return res.status(401).json({
-        success: false,
-        message: 'User account is not active'
-      });
-    }
-
-    // Update login stats
-    await user.updateLoginStats();
-
-    // Generate tokens
-    const token = generateToken(user._id);
-    const refreshToken = generateRefreshToken(user._id);
-
-    // Save refresh token
-    user.refreshToken = refreshToken;
-    await user.save();
-
-    res.status(200).json({
-      success: true,
-      token,
-      refreshToken,
-      user
-    });
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error logging in',
       error: error.message
     });
   }
