@@ -75,50 +75,26 @@ const app = express();
 // Enhanced CORS configuration for production
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, curl, postman)
-    if (!origin) {
-      console.log('CORS: Allowing request with no origin');
-      return callback(null, true);
-    }
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
     
-    const allowedOrigins = process.env.ALLOWED_ORIGINS
-      ? process.env.ALLOWED_ORIGINS.split(",").map(origin => origin.trim())
-      : [
-          "http://localhost:3000", 
-          "http://localhost:3001",
-          "https://app.themenucompany.mx",
-          "https://tmc-recipe-manager-frontend.vercel.app",
-          "https://tmc-recipe-manager-backend.vercel.app"
-        ];
-    
-    // Always log CORS attempts for debugging
-    console.log(`CORS check for origin: ${origin}`);
-    console.log(`Allowed origins: ${allowedOrigins.join(", ")}`);
-    console.log(`Environment: ${process.env.NODE_ENV}`);
-    console.log(`ALLOWED_ORIGINS env var: ${process.env.ALLOWED_ORIGINS}`);
+    const allowedOrigins = [
+      "https://app.themenucompany.mx",
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "https://tmc-recipe-manager-frontend.vercel.app"
+    ];
     
     if (allowedOrigins.includes(origin)) {
-      console.log(`CORS: Allowing origin: ${origin}`);
       callback(null, true);
     } else {
-      console.log(`CORS: Blocking origin: ${origin}`);
-      console.log(`Allowed origins: ${allowedOrigins.join(", ")}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
-  optionsSuccessStatus: 200,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-  allowedHeaders: [
-    "Content-Type", 
-    "Authorization", 
-    "X-Requested-With",
-    "Accept",
-    "Origin",
-    "X-API-Key"
-  ],
-  exposedHeaders: ["Set-Cookie", "X-Total-Count"],
-  maxAge: 86400 // Cache preflight for 24 hours
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  optionsSuccessStatus: 200
 };
 
 app.use(cors(corsOptions));
