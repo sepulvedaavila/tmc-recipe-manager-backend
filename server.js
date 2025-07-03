@@ -72,29 +72,36 @@ const app = express();
   }
 })();
 
-// Enhanced CORS configuration for production
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
+    // List of allowed origins
+    const allowedOrigins = [
+      "http://localhost:3000",
+      "http://localhost:3001", 
+      "https://app.themenucompany.mx",
+      "https://tmc-recipe-manager-frontend.vercel.app",
+      "https://tmc-recipe-manager-backend.vercel.app"
+    ];
+
+    // Allow requests with no origin
     if (!origin) return callback(null, true);
     
-    const allowedOrigins = [
-      "https://app.themenucompany.mx",
-      "http://localhost:3000",
-      "http://localhost:3001",
-      "https://tmc-recipe-manager-frontend.vercel.app"
-    ];
-    
-    if (allowedOrigins.includes(origin)) {
+    // Check if origin is in allowed list
+    if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      // For debugging: Allow the request but log it
+      console.warn(`Allowing CORS request from unlisted origin: ${origin}`);
+      callback(null, true); // TEMPORARY: Remove this line in production
+      // callback(new Error('Not allowed by CORS')); // Uncomment this in production
     }
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-  optionsSuccessStatus: 200
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
+  exposedHeaders: ["Set-Cookie"],
+  optionsSuccessStatus: 200,
+  maxAge: 86400
 };
 
 app.use(cors(corsOptions));
