@@ -1,42 +1,52 @@
+// db/mongodb.js
 const mongoose = require('mongoose');
 require('dotenv').config();
-
-// Use connection URI from environment with fallback
-// IMPORTANT: In production, never expose credentials in code.
-// They should only come from environment variables.
-const uri = process.env.MONGODB_URI || "mongodb://localhost:27017/recipeplan"; 
 
 // Track connection state
 let dbConnection = null;
 
 /**
+ * Clean MongoDB URI by removing deprecated options
+ */
+const cleanMongoUri = (uri) => {
+  if (!uri) return uri;
+  
+  // Parse the URI and remove deprecated query parameters
+  const url = new URL(uri);
+  const deprecatedParams = ['bufferMaxEntries', 'autoReconnect', 'reconnectTries', 'reconnectInterval'];
+  
+  deprecatedParams.forEach(param => {
+    url.searchParams.delete(param);
+  });
+  
+  return url.toString();
+};
+
+/**
  * Connect to MongoDB with reconnection logic
- * Optimized for Vercel serverless environment
  */
 const connectDB = async () => {
   try {
     console.log('Attempting to connect to MongoDB...');
     console.log('MongoDB URI provided:', process.env.MONGODB_URI ? 'Yes' : 'No');
     
-    // Configure Mongoose connection options for serverless
+    // Get and clean the URI
+    const rawUri = process.env.MONGODB_URI || "mongodb://localhost:27017/recipeplan";
+    const uri = cleanMongoUri(rawUri);
+    
+    // Configure Mongoose connection options for production
     const options = {
       serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
       socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
-      maxPoolSize: 1, // Reduced for serverless (single connection)
-      minPoolSize: 0, // Allow 0 connections when idle
-      maxIdleTimeMS: 30000, // Close idle connections after 30 seconds
+      maxPoolSize: 10, // Maintain up to 10 socket connections
       retryWrites: true,
       w: 'majority',
-      bufferCommands: false, // Disable mongoose buffering for serverless
-      bufferMaxEntries: 0, // Disable mongoose buffering
-      connectTimeoutMS: 10000, // Connection timeout
-      heartbeatFrequencyMS: 10000, // Heartbeat frequency
-      autoReconnect: true,
-      reconnectTries: 3,
-      reconnectInterval: 1000
+      // Disable deprecated options that might still be set
+      useNewUrlParser: true,
+      useUnifiedTopology: true
     };
 
-    // Create a Mongoose client with a MongoClientOptions object to set the Stable API version
+    // Connect to MongoDB
     await mongoose.connect(uri, options);
     console.log("Connected to MongoDB!");
     
@@ -64,7 +74,7 @@ const connectDB = async () => {
     
   } catch (error) {
     console.error('Failed to connect to MongoDB:', error);
-    console.error('Connection string format check:', uri ? 'URI exists' : 'URI missing');
+    console.error('Connection string format check:', process.env.MONGODB_URI ? 'URI exists' : 'URI missing');
     throw error;
   }
 };
