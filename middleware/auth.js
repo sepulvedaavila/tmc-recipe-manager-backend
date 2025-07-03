@@ -3,18 +3,24 @@ const User = require('../models/User');
 
 // Generate JWT token
 const generateToken = (userId) => {
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET environment variable is required');
+  }
   return jwt.sign(
     { userId }, 
-    process.env.JWT_SECRET || 'your-secret-key-here',
+    process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRE || '7d' }
   );
 };
 
 // Generate refresh token
 const generateRefreshToken = (userId) => {
+  if (!process.env.JWT_REFRESH_SECRET) {
+    throw new Error('JWT_REFRESH_SECRET environment variable is required');
+  }
   return jwt.sign(
     { userId, type: 'refresh' },
-    process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key-here',
+    process.env.JWT_REFRESH_SECRET,
     { expiresIn: process.env.JWT_REFRESH_EXPIRE || '30d' }
   );
 };
@@ -38,7 +44,10 @@ const authenticate = async (req, res, next) => {
 
     try {
       // Verify token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-here');
+      if (!process.env.JWT_SECRET) {
+        throw new Error('JWT_SECRET environment variable is required');
+      }
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
       
       // Find user and attach to request
       req.user = await User.findById(decoded.userId).select('-password');
@@ -105,7 +114,10 @@ const optionalAuth = async (req, res, next) => {
 
     if (token) {
       try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-here');
+        if (!process.env.JWT_SECRET) {
+          throw new Error('JWT_SECRET environment variable is required');
+        }
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
         req.user = await User.findById(decoded.userId).select('-password');
       } catch (error) {
         // Token is invalid, but we continue without user

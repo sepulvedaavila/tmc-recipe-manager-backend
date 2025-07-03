@@ -63,3 +63,5 @@ SCHEMA_CHANGES_FRONTEND.md
 
 scripts/create-admin-user.js
 scripts/fix-user-preferences.js
+
+tempPsswd.md

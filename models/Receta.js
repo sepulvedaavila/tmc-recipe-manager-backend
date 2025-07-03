@@ -2,7 +2,6 @@ const mongoose = require('mongoose');
 
 // Define ingrediente schema to match your MongoDB collection's structure
 //connectDB();
-//mongoose.connect('mongodb+srv://tmc-app-mgr:zo20wf9XLFJG6fUI@cluster0.wbsaj.mongodb.net/?appName=Cluster0');
 const ingredienteSchema = new mongoose.Schema({
   ingrediente: {
     type: String,

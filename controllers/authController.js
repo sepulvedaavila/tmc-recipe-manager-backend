@@ -294,7 +294,10 @@ exports.refreshToken = async (req, res) => {
     // Verify refresh token
     let decoded;
     try {
-      decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key-here');
+      if (!process.env.JWT_REFRESH_SECRET) {
+        throw new Error('JWT_REFRESH_SECRET environment variable is required');
+      }
+      decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
     } catch (error) {
       return res.status(401).json({
         success: false,

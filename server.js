@@ -1,11 +1,38 @@
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
+
+// Validate required environment variables
+const requiredEnvVars = [
+  'JWT_SECRET',
+  'JWT_REFRESH_SECRET',
+  'MONGODB_URI'
+];
+
+const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+if (missingEnvVars.length > 0) {
+  console.error('❌ Missing required environment variables:', missingEnvVars.join(', '));
+  console.error('Please check your .env file and ensure all required variables are set.');
+  process.exit(1);
+}
+
+console.log('✅ All required environment variables are set');
+
 // Use the correct path for the database connection
 const { connectDB, getConnectionStatus } = require("./db/mongodb");
 const errorHandler = require("./middleware/errorHandler");
 const requestLogger = require("./middleware/requestLogger");
 const { ensureDbConnection } = require("./middleware/dbMiddleware");
+const { 
+  requestMonitor, 
+  performanceMonitor, 
+  errorMonitor, 
+  dbPerformanceMonitor, 
+  memoryMonitor, 
+  rateLimitMonitor,
+  healthCheck: monitoringHealthCheck
+} = require("./middleware/monitoring");
 
 // Import routes
 const recetasRoutes = require("./routes/recetas");
@@ -45,14 +72,14 @@ const app = express();
   }
 })();
 
-// Configure CORS - essential for both development and production
+// Enhanced CORS configuration for production
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (mobile apps, curl, postman)
     if (!origin) return callback(null, true);
     
     const allowedOrigins = process.env.ALLOWED_ORIGINS
-      ? process.env.ALLOWED_ORIGINS.split(",")
+      ? process.env.ALLOWED_ORIGINS.split(",").map(origin => origin.trim())
       : [
           "http://localhost:3000", 
           "http://localhost:3001",
@@ -61,10 +88,18 @@ const corsOptions = {
           "https://tmc-recipe-manager-backend.vercel.app"
         ];
     
+    // Log CORS attempts in development
+    if (process.env.NODE_ENV === "development") {
+      console.log(`CORS check for origin: ${origin}`);
+    }
+    
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      console.log(`CORS blocked origin: ${origin}`);
+      if (process.env.NODE_ENV === "development") {
+        console.log(`CORS blocked origin: ${origin}`);
+        console.log(`Allowed origins: ${allowedOrigins.join(", ")}`);
+      }
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -76,9 +111,11 @@ const corsOptions = {
     "Authorization", 
     "X-Requested-With",
     "Accept",
-    "Origin"
+    "Origin",
+    "X-API-Key"
   ],
-  exposedHeaders: ["Set-Cookie"]
+  exposedHeaders: ["Set-Cookie", "X-Total-Count"],
+  maxAge: 86400 // Cache preflight for 24 hours
 };
 
 app.use(cors(corsOptions));
@@ -90,15 +127,16 @@ app.options("*", cors(corsOptions));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// Middleware to help debug API requests, especially in Vercel
-app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
-  // For Vercel, check request headers that might be important
-  console.log("Origin:", req.get("origin"));
-  console.log("Host:", req.get("host"));
-  // Continue processing
-  next();
-});
+// Enhanced monitoring and logging middleware
+app.use(requestMonitor);
+app.use(performanceMonitor);
+app.use(memoryMonitor);
+app.use(rateLimitMonitor);
+
+// Database performance monitoring (only in development)
+if (process.env.NODE_ENV === 'development') {
+  app.use(dbPerformanceMonitor);
+}
 
 // Request logging
 app.use(requestLogger);
@@ -134,41 +172,75 @@ app.get("/api/test", (req, res) => {
   });
 });
 
-// Health check endpoint with database status
+// Enhanced health check endpoint for monitoring
 app.get("/api/health", async (req, res) => {
   try {
     const connectionStatus = getConnectionStatus();
+    const mongoose = require("mongoose");
 
-    // Test basic database operation
-    let dbTest = null;
+    // Test database connectivity with ping
+    let dbStatus = "disconnected";
+    let dbPing = null;
+    
     try {
       if (connectionStatus.readyState === 1) {
+        await mongoose.connection.db.admin().ping();
+        dbStatus = "connected";
+        dbPing = "success";
+        
+        // Test basic database operations
         const Receta = require("./models/Receta");
         const count = await Receta.countDocuments();
-        dbTest = { success: true, recipeCount: count };
+        dbPing = { success: true, recipeCount: count };
       } else {
-        dbTest = { success: false, reason: "Database not connected" };
+        dbStatus = "disconnected";
+        dbPing = { success: false, reason: "Database not connected" };
       }
-    } catch (error) {
-      dbTest = { success: false, error: error.message };
+    } catch (pingError) {
+      dbStatus = "error";
+      dbPing = { success: false, error: pingError.message };
     }
 
-    res.status(200).json({
-      status: "OK",
-      message: "API is running",
+    // Get system information
+    const systemInfo = {
+      nodeVersion: process.version,
+      platform: process.platform,
+      memory: {
+        used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+        total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024)
+      },
+      uptime: process.uptime()
+    };
+
+    const healthStatus = dbStatus === "connected" ? "healthy" : "unhealthy";
+
+    res.status(dbStatus === "connected" ? 200 : 503).json({
+      status: healthStatus,
+      message: healthStatus === "healthy" ? "API is running" : "API has issues",
       timestamp: new Date().toISOString(),
-      database: connectionStatus,
-      dbTest: dbTest,
+      database: {
+        status: dbStatus,
+        connection: connectionStatus,
+        ping: dbPing
+      },
+      system: systemInfo,
       environment: process.env.NODE_ENV || "development",
+      version: process.env.npm_package_version || "1.0.0"
     });
   } catch (error) {
+    console.error("Health check error:", error);
     res.status(500).json({
-      status: "ERROR",
+      status: "error",
       message: "Health check failed",
-      error: error.message,
-      timestamp: new Date().toISOString(),
+      error: process.env.NODE_ENV === "development" ? error.message : "Internal server error",
+      timestamp: new Date().toISOString()
     });
   }
+});
+
+// Monitoring dashboard endpoint
+app.get("/api/monitoring", (req, res) => {
+  monitoringHealthCheck(req, res);
 });
 
 // Diagnostic endpoint for debugging
@@ -350,7 +422,8 @@ app.use("*", (req, res) => {
   res.status(404).json({ message: "Resource not found" });
 });
 
-// Global error handler
+// Enhanced error handling with monitoring
+app.use(errorMonitor);
 app.use(errorHandler);
 
 // Export the app for Vercel (serverless functions don't need a listening server)
