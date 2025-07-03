@@ -1,6 +1,6 @@
-const express = require("express");
-const cors = require("cors");
-require("dotenv").config();
+const express = require('express');
+const cors = require('cors');
+require('dotenv').config();
 
 // Validate required environment variables
 const requiredEnvVars = [
@@ -20,10 +20,10 @@ if (missingEnvVars.length > 0) {
 console.log('✅ All required environment variables are set');
 
 // Use the correct path for the database connection
-const { connectDB, getConnectionStatus } = require("./db/mongodb");
-const errorHandler = require("./middleware/errorHandler");
-const requestLogger = require("./middleware/requestLogger");
-const { ensureDbConnection } = require("./middleware/dbMiddleware");
+const { connectDB, getConnectionStatus } = require('./db/mongodb');
+const errorHandler = require('./middleware/errorHandler');
+const requestLogger = require('./middleware/requestLogger');
+const { ensureDbConnection } = require('./middleware/dbMiddleware');
 const { 
   requestMonitor, 
   performanceMonitor, 
@@ -32,7 +32,7 @@ const {
   memoryMonitor, 
   rateLimitMonitor,
   healthCheck: monitoringHealthCheck
-} = require("./middleware/monitoring");
+} = require('./middleware/monitoring');
 
 // Import routes
 const recetasRoutes = require("./routes/recetas");
@@ -438,10 +438,11 @@ if (process.env.NODE_ENV !== "production") {
     console.log(`🚀 Server running in ${NODE_ENV} mode`);
     console.log(`📡 Port: ${PORT}`);
     console.log(`🌐 API available at: http://${HOST}:${PORT}`);
-    console.log(`🏥 Health check: http://${HOST}:${PORT}/health`);
-    console.log(`🔍 Debug endpoint: http://${HOST}:${PORT}/debug`);
-    console.log(`🧪 Test endpoint: http://${HOST}:${PORT}/test`);
-    console.log(`📝 Recipes endpoint: http://${HOST}:${PORT}/recipes`);
+    console.log(`🏥 Health check: http://${HOST}:${PORT}/api/health`);
+    console.log(`📊 Monitoring: http://${HOST}:${PORT}/api/monitoring`);
+    console.log(`🔍 Debug endpoint: http://${HOST}:${PORT}/api/debug`);
+    console.log(`🧪 Test endpoint: http://${HOST}:${PORT}/api/test`);
+    console.log(`📝 Recipes endpoint: http://${HOST}:${PORT}/api/recipes`);
     if (NODE_ENV === "development") {
       console.log(`🎯 Frontend should proxy to: http://${HOST}:${PORT}`);
     }

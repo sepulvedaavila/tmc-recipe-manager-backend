@@ -62,6 +62,7 @@ SCHEMA_CHANGES_FRONTEND.md
 .gitignore
 
 scripts/create-admin-user.js
+
 scripts/fix-user-preferences.js
 
 tempPsswd.md
