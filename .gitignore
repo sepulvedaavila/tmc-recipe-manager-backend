@@ -66,3 +66,5 @@ scripts/create-admin-user.js
 scripts/fix-user-preferences.js
 
 tempPsswd.md
+
+CORS_FIX_INSTRUCTIONS.md

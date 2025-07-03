@@ -76,7 +76,10 @@ const app = express();
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (mobile apps, curl, postman)
-    if (!origin) return callback(null, true);
+    if (!origin) {
+      console.log('CORS: Allowing request with no origin');
+      return callback(null, true);
+    }
     
     const allowedOrigins = process.env.ALLOWED_ORIGINS
       ? process.env.ALLOWED_ORIGINS.split(",").map(origin => origin.trim())
@@ -88,18 +91,18 @@ const corsOptions = {
           "https://tmc-recipe-manager-backend.vercel.app"
         ];
     
-    // Log CORS attempts in development
-    if (process.env.NODE_ENV === "development") {
-      console.log(`CORS check for origin: ${origin}`);
-    }
+    // Always log CORS attempts for debugging
+    console.log(`CORS check for origin: ${origin}`);
+    console.log(`Allowed origins: ${allowedOrigins.join(", ")}`);
+    console.log(`Environment: ${process.env.NODE_ENV}`);
+    console.log(`ALLOWED_ORIGINS env var: ${process.env.ALLOWED_ORIGINS}`);
     
     if (allowedOrigins.includes(origin)) {
+      console.log(`CORS: Allowing origin: ${origin}`);
       callback(null, true);
     } else {
-      if (process.env.NODE_ENV === "development") {
-        console.log(`CORS blocked origin: ${origin}`);
-        console.log(`Allowed origins: ${allowedOrigins.join(", ")}`);
-      }
+      console.log(`CORS: Blocking origin: ${origin}`);
+      console.log(`Allowed origins: ${allowedOrigins.join(", ")}`);
       callback(new Error('Not allowed by CORS'));
     }
   },

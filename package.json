@@ -20,6 +20,7 @@
     "update-guide": "node scripts/update-application.js"
   },
   "dependencies": {
+    "axios": "^1.6.0",
     "bcrypt": "^6.0.0",
     "body-parser": "^1.20.1",
     "cors": "^2.8.5",
