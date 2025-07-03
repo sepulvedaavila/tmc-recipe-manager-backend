@@ -3,36 +3,24 @@ const User = require('../models/User');
 
 // Generate JWT token
 const generateToken = (userId) => {
-<<<<<<< HEAD
   if (!process.env.JWT_SECRET) {
     throw new Error('JWT_SECRET environment variable is required');
   }
   return jwt.sign(
     { userId }, 
     process.env.JWT_SECRET,
-=======
-  return jwt.sign(
-    { userId }, 
-    process.env.JWT_SECRET || 'your-secret-key-here',
->>>>>>> refs/remotes/origin/main
     { expiresIn: process.env.JWT_EXPIRE || '7d' }
   );
 };
 
 // Generate refresh token
 const generateRefreshToken = (userId) => {
-<<<<<<< HEAD
   if (!process.env.JWT_REFRESH_SECRET) {
     throw new Error('JWT_REFRESH_SECRET environment variable is required');
   }
   return jwt.sign(
     { userId, type: 'refresh' },
     process.env.JWT_REFRESH_SECRET,
-=======
-  return jwt.sign(
-    { userId, type: 'refresh' },
-    process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key-here',
->>>>>>> refs/remotes/origin/main
     { expiresIn: process.env.JWT_REFRESH_EXPIRE || '30d' }
   );
 };
@@ -56,14 +44,10 @@ const authenticate = async (req, res, next) => {
 
     try {
       // Verify token
-<<<<<<< HEAD
       if (!process.env.JWT_SECRET) {
         throw new Error('JWT_SECRET environment variable is required');
       }
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-=======
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-here');
->>>>>>> refs/remotes/origin/main
       
       // Find user and attach to request
       req.user = await User.findById(decoded.userId).select('-password');
@@ -130,14 +114,10 @@ const optionalAuth = async (req, res, next) => {
 
     if (token) {
       try {
-<<<<<<< HEAD
         if (!process.env.JWT_SECRET) {
           throw new Error('JWT_SECRET environment variable is required');
         }
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-=======
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-here');
->>>>>>> refs/remotes/origin/main
         req.user = await User.findById(decoded.userId).select('-password');
       } catch (error) {
         // Token is invalid, but we continue without user
