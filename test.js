@@ -1,9 +1,15 @@
 module.exports = async (req, res) => {
   try {
-    // Set CORS headers
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    // Set CORS headers for all origins during testing
+    const origin = req.headers.origin;
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+    } else {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    }
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
     
     if (req.method === 'OPTIONS') {
       return res.status(200).end();
@@ -16,6 +22,11 @@ module.exports = async (req, res) => {
       url: req.url,
       environment: process.env.NODE_ENV || 'development',
       nodejs_version: process.version,
+      cors: {
+        origin: origin || 'no-origin',
+        allowed: true,
+        credentials: true
+      },
       headers: {
         host: req.headers.host,
         'user-agent': req.headers['user-agent'],
@@ -23,7 +34,8 @@ module.exports = async (req, res) => {
       },
       env_check: {
         mongodb_uri: process.env.MONGODB_URI ? 'Set' : 'Not set',
-        node_env: process.env.NODE_ENV || 'Not set'
+        node_env: process.env.NODE_ENV || 'Not set',
+        allowed_origins: process.env.ALLOWED_ORIGINS || 'Not set'
       }
     };
     

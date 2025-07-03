@@ -6,25 +6,34 @@ require('dotenv').config();
 // They should only come from environment variables.
 const uri = process.env.MONGODB_URI || "mongodb://localhost:27017/recipeplan"; 
 
-
 // Track connection state
 let dbConnection = null;
 
 /**
  * Connect to MongoDB with reconnection logic
+ * Optimized for Vercel serverless environment
  */
 const connectDB = async () => {
   try {
     console.log('Attempting to connect to MongoDB...');
     console.log('MongoDB URI provided:', process.env.MONGODB_URI ? 'Yes' : 'No');
     
-    // Configure Mongoose connection options for production
+    // Configure Mongoose connection options for serverless
     const options = {
       serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
       socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
-      maxPoolSize: 10, // Maintain up to 10 socket connections
+      maxPoolSize: 1, // Reduced for serverless (single connection)
+      minPoolSize: 0, // Allow 0 connections when idle
+      maxIdleTimeMS: 30000, // Close idle connections after 30 seconds
       retryWrites: true,
-      w: 'majority'
+      w: 'majority',
+      bufferCommands: false, // Disable mongoose buffering for serverless
+      bufferMaxEntries: 0, // Disable mongoose buffering
+      connectTimeoutMS: 10000, // Connection timeout
+      heartbeatFrequencyMS: 10000, // Heartbeat frequency
+      autoReconnect: true,
+      reconnectTries: 3,
+      reconnectInterval: 1000
     };
 
     // Create a Mongoose client with a MongoClientOptions object to set the Stable API version
