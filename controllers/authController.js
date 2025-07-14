@@ -284,7 +284,10 @@ exports.refreshToken = async (req, res) => {
   try {
     const { refreshToken } = req.body;
 
+    console.log('🔄 Refresh token request received');
+
     if (!refreshToken) {
+      console.log('❌ No refresh token provided in request body');
       return res.status(400).json({
         success: false,
         message: 'Refresh token is required'
@@ -298,7 +301,9 @@ exports.refreshToken = async (req, res) => {
         throw new Error('JWT_REFRESH_SECRET environment variable is required');
       }
       decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+      console.log('✅ Refresh token verified successfully');
     } catch (error) {
+      console.log('❌ Invalid refresh token:', error.message);
       return res.status(401).json({
         success: false,
         message: 'Invalid refresh token'
@@ -308,7 +313,16 @@ exports.refreshToken = async (req, res) => {
     // Find user and verify refresh token matches
     const user = await User.findById(decoded.userId);
 
-    if (!user || user.refreshToken !== refreshToken) {
+    if (!user) {
+      console.log('❌ User not found for refresh token');
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid refresh token'
+      });
+    }
+
+    if (user.refreshToken !== refreshToken) {
+      console.log('❌ Refresh token mismatch for user:', user._id);
       return res.status(401).json({
         success: false,
         message: 'Invalid refresh token'
@@ -323,13 +337,15 @@ exports.refreshToken = async (req, res) => {
     user.refreshToken = newRefreshToken;
     await user.save();
 
+    console.log('✅ New tokens generated for user:', user._id);
+
     res.status(200).json({
       success: true,
       token: newToken,
       refreshToken: newRefreshToken
     });
   } catch (error) {
-    console.error('Refresh token error:', error);
+    console.error('❌ Refresh token error:', error);
     res.status(500).json({
       success: false,
       message: 'Error refreshing token',
